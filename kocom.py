@@ -209,28 +209,39 @@ def send(dest, src, cmd, value, log=None, check_ack=True):
     send_lock.acquire()
     ack_data.clear()
     ret = False
-    for seq_h in seq_t_dic.keys(): # if there's no ACK received, then repeat sending with next sequence code
+    for seq_h in seq_t_dic.keys():  # retry with different sequence header
         payload = type_h_dic['send'] + seq_h + '00' + dest + src + cmd + value
-        send_data = header_h + payload + chksum(payload) + trailer_h 
-        try:
-            if rs485.write(bytearray.fromhex(send_data)) == False:
-                raise Exception('Not ready')
-        except Exception as ex:
-            logging.error("[RS485] Write error.[{}]".format(ex) )
+        send_data = header_h + payload + chksum(payload) + trailer_h
+
+        # 🔁 재시도 로직
+        retry_limit = 3
+        for attempt in range(retry_limit):
+            try:
+                result = rs485.write(bytearray.fromhex(send_data))
+                if result != False:
+                    break  # 성공
+            except (BrokenPipeError, ConnectionResetError) as critical:
+                logging.warning(f"[RS485] Critical write error (attempt {attempt+1}): {critical}. Reconnecting...")
+                rs485.reconnect()
+            except Exception as e:
+                logging.warning(f"[RS485] Write attempt {attempt+1} failed: {e}")
+                time.sleep(0.1)
+        else:
+            logging.error("[RS485] All write attempts failed.")
             break
-        if log != None:
+
+        if log is not None:
             logging.info('[SEND|{}] {}'.format(log, send_data))
-        if check_ack == False:
+        if not check_ack:
             time.sleep(1)
             ret = send_data
             break
 
-        # wait and checking for ACK
-        ack_data.append(type_h_dic['ack'] + seq_h + '00' +  src + dest + cmd + value)
+        ack_data.append(type_h_dic['ack'] + seq_h + '00' + src + dest + cmd + value)
         try:
-            ack_q.get(True, 1.3+0.2*random.random()) # random wait between 1.3~1.5 seconds for ACK
+            ack_q.get(True, 1.3 + 0.2 * random.random())
             if config.get('Log', 'show_recv_hex') == 'True':
-                logging.info ('[ACK] OK')
+                logging.info('[ACK] OK')
             ret = send_data
             break
         except queue.Empty:
@@ -242,6 +253,7 @@ def send(dest, src, cmd, value, log=None, check_ack=True):
     ack_data.clear()
     send_lock.release()
     return ret
+
 
 
 def chksum(data_h):
