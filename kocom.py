@@ -742,20 +742,21 @@ def poll_state(enforce=False):
             thread_instance.start()
 
     for t in dev_list:
-        dev = t.split('_')
-        if dev[0] in no_polling_list:
-            continue
+    dev = t.split('_')
+    if dev[0] in no_polling_list or dev[0] == 'fan':
+        continue  # 🚫 팬(fan) 장치는 상태 조회하지 않음
 
-        dev_id = device_h_dic.get(dev[0])
-        if len(dev) > 1:
-            sub_id = room_h_dic.get(dev[1])
-        else:
-            sub_id = '00'
+    dev_id = device_h_dic.get(dev[0])
+    if len(dev) > 1:
+        sub_id = room_h_dic.get(dev[1])
+    else:
+        sub_id = '00'
 
-        if dev_id != None and sub_id != None:
-            if query(dev_id + sub_id, publish=True, enforce=enforce)['flag'] == False:
-                break
-            time.sleep(1)
+    if dev_id != None and sub_id != None:
+        if query(dev_id + sub_id, publish=True, enforce=enforce)['flag'] == False:
+            continue  # break → continue 로 변경하면 실패해도 다른 장치는 계속 조회
+        time.sleep(1)
+
 
     poll_timer.cancel()
     poll_timer = threading.Timer(polling_interval, poll_state)
