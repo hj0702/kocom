@@ -742,7 +742,7 @@ def poll_state(enforce=False):
             thread_instance.start()
 
     for t in dev_list:
-    dev = t.split('_')
+        dev = t.split('_')
     if dev[0] in no_polling_list or dev[0] == 'fan':
         continue  # 🚫 팬(fan) 장치는 상태 조회하지 않음
 
