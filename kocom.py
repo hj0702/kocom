@@ -735,28 +735,27 @@ def poll_state(enforce=False):
     dev_list = [x.strip() for x in config.get('Device','enabled').split(',')]
     no_polling_list = ['wallpad', 'elevator']
 
-    #thread health check
+    # thread 상태 체크
     for thread_instance in thread_list:
         if thread_instance.is_alive() == False:
-            logging.error('[THREAD] {} is not active. starting.'.format( thread_instance.name))
+            logging.error('[THREAD] {} is not active. starting.'.format(thread_instance.name))
             thread_instance.start()
 
     for t in dev_list:
-        dev = t.split('_')
-    if dev[0] in no_polling_list or dev[0] == 'fan':
-        continue  # 🚫 팬(fan) 장치는 상태 조회하지 않음
+        dev = t.split('_')  # ← 들여쓰기 되어야 함
+        if dev[0] in no_polling_list or dev[0] == 'fan':
+            continue  # ← 이 줄도 들여쓰기되어야 정상
 
-    dev_id = device_h_dic.get(dev[0])
-    if len(dev) > 1:
-        sub_id = room_h_dic.get(dev[1])
-    else:
-        sub_id = '00'
+        dev_id = device_h_dic.get(dev[0])
+        if len(dev) > 1:
+            sub_id = room_h_dic.get(dev[1])
+        else:
+            sub_id = '00'
 
-    if dev_id != None and sub_id != None:
-        if query(dev_id + sub_id, publish=True, enforce=enforce)['flag'] == False:
-            continue  # break → continue 로 변경하면 실패해도 다른 장치는 계속 조회
-        time.sleep(1)
-
+        if dev_id is not None and sub_id is not None:
+            if query(dev_id + sub_id, publish=True, enforce=enforce)['flag'] == False:
+                continue
+            time.sleep(1)
 
     poll_timer.cancel()
     poll_timer = threading.Timer(polling_interval, poll_state)
